@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log*
+yarn-debug.log*
+.env
+.git
+.gitignore
+docker-compose.yml
+backend_kvackalnica/uploads

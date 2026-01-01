@@ -1,0 +1,41 @@
+docker-compose exec backend node createTables.js
+
+____________________________________________________________
+
+docker exec -it cassandra1 cqlsh
+
+CREATE KEYSPACE IF NOT EXISTS kvackalnica
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+
+CREATE TABLE IF NOT EXISTS kvackalnica.user_events_by_day (
+  day text,
+  event_time bigint,
+  event_id text,
+  user_id text,
+  activity_type text,
+  PRIMARY KEY ((day), event_time, event_id)
+) WITH CLUSTERING ORDER BY (event_time DESC);
+
+____________________________________________________________
+
+docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --create --topic user_events_by_day --partitions 1 --replication-factor 1
+
+docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --list
+
+____________________________________________________________
+
+curl http://localhost:8083/connector-plugins
+
+curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink.json
+
+curl http://localhost:8083/connectors/cassandra-sink-activity/status
+
+____________________________________________________________
+
+backend_kvackalnica: npm i kafkajs @kafkajs/confluent-schema-registry
+curl -X POST http://localhost:5000/debug/emit-event -H "Content-Type: application/json" -d "{\"user_id\":\"u123\",\"activity_type\":\"PROJECT_CREATED\"}"
+docker exec kafka-broker kafka-console-consumer --bootstrap-server kafka-broker:29092 --topic user_events_by_day --from-beginning --max-messages 5
+
+curl http://localhost:8081/subjects/user_events_by_day-value/versions/latest
+
+SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-01';

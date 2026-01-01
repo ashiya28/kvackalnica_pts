@@ -1,0 +1,32 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Env / secrets
+.env
+**/.env
+*.pem
+*.key
+
+# Uploads / build artifacts
+backend_kvackalnica/uploads/
+frontend_kvackalnica/dist/
+frontend_kvackalnica/build/
+
+# Docker / local config
+docker-compose.override.yml
+*.log
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Misc
+coverage/
+jest-cache/
+jest-transform-cache/
+*.sqlite

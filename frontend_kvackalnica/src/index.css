@@ -1,0 +1,222 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer components {
+  /* Glavni okvir strani */
+  .page-container {
+    @apply w-4/5 md:w-3/4 mx-auto mt-10 mb-20 flex flex-col items-center justify-center bg-blue-100 rounded-3xl shadow-xl p-10 relative;
+  }
+
+  /* Glavni naslov */
+  .page-title {
+    @apply text-6xl font-bold text-gray-800 text-center mb-12;
+  }
+
+  /* Standardni gumb */
+  .main-button {
+    @apply bg-blue-400 text-white font-semibold text-lg px-10 py-4 rounded-3xl
+           hover:bg-blue-500 hover:scale-105 transition-all duration-300 shadow-md w-72;
+  }
+
+  /* Layout za gumbe */
+  .button-group {
+    @apply flex flex-col items-center gap-6;
+  }
+
+  .text {
+    @apply text-center
+  }
+
+  .form-input {
+    @apply p-3 rounded-md w-full text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all;
+  }
+
+  .form-input:focus::placeholder {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .form-textarea {
+    @apply w-full bg-white text-center border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-400 transition-all 
+    min-h-[180px] resize-y;
+  }
+
+  .form-textarea::placeholder {
+    position: absolute;
+    top: 50%; 
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+  }
+
+  .form-textarea:focus::placeholder {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .form-label {
+    @apply block text-gray-700 font-semibold mb-2 text-center;
+  }
+
+  .form-container {
+    @apply flex flex-col space-y-4 w-2/3 items-center;
+  }
+
+  /* ====== Sekundarni / posebni gumbi ====== */
+  .special-button {
+    @apply bg-gradient-to-r from-sky-400 via-sky-500 to-sky-400 text-white font-semibold px-6 py-3 rounded-full shadow-lg hover:opacity-90 hover:scale-105 transition-all duration-300;
+  }
+
+  /* ====== Projekt kartice ====== */
+  .projects-list {
+    @apply w-full max-w-4xl space-y-6;
+  }
+
+  .project-card {
+    @apply bg-white rounded-2xl shadow-lg p-6 border-l-4 border-blue-400 hover:shadow-xl transition-all duration-300;
+  }
+
+  .project-card.finished {
+    @apply border-green-400 bg-green-50;
+  }
+
+  .project-title {
+    @apply text-2xl font-bold text-gray-800 mb-3;
+  }
+
+  .project-description {
+    @apply text-gray-600 mb-4 leading-relaxed;
+  }
+
+  .project-date {
+    @apply text-sm text-gray-500 mb-4;
+  }
+
+  .project-actions {
+    @apply flex gap-3 justify-center flex-wrap;
+  }
+
+  .btn-success {
+    @apply bg-green-500 hover:bg-green-600 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-300 hover:scale-105;
+  }
+
+  .btn-danger {
+    @apply bg-red-500 hover:bg-red-600 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-300 hover:scale-105;
+  }
+
+  .btn-edit {
+    @apply bg-blue-500 hover:bg-blue-600 text-white font-semibold px-4 py-2 rounded-lg transition-all duration-300 hover:scale-105;
+  }
+
+  /* ====== Edit form ====== */
+  .edit-form {
+    @apply bg-gray-50 rounded-lg p-4 mt-4 border border-gray-200;
+  }
+
+  .edit-form input,
+  .edit-form textarea {
+    @apply w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400;
+  }
+
+  .edit-form textarea {
+    @apply min-h-[100px] resize-y;
+  }
+
+  .edit-form-actions {
+    @apply flex gap-2 justify-center mt-3;
+  }
+
+  /* ====== Blue-themed project cards ====== */
+  .project-card-blue {
+    @apply bg-gradient-to-br from-blue-50 to-blue-100 rounded-2xl shadow-lg p-6 border-l-4 border-blue-400 hover:shadow-xl transition-all duration-300 hover:from-blue-100 hover:to-blue-200;
+  }
+
+  .project-title-blue {
+    @apply text-2xl font-bold text-black mb-3;
+  }
+
+  .project-description-blue {
+    @apply text-black mb-3 leading-relaxed;
+  }
+
+  .project-date-blue {
+    @apply text-sm text-black mb-4;
+  }
+
+  .project-actions-blue {
+    @apply flex gap-3 justify-center flex-wrap;
+  }
+
+  .btn-details-blue {
+    @apply bg-gradient-to-r from-sky-400 via-sky-500 to-sky-400 hover:from-sky-500 hover:via-sky-600 hover:to-sky-500 text-white font-semibold px-6 py-3 rounded-full transition-all duration-300 hover:scale-105 shadow-lg;
+  }
+
+  .btn-finish-blue {
+    @apply bg-gradient-to-r from-green-400 via-green-500 to-green-400 hover:from-green-500 hover:via-green-600 hover:to-green-500 text-white font-semibold px-6 py-3 rounded-full transition-all duration-300 hover:scale-105 shadow-lg;
+  }
+
+  .btn-delete-blue {
+    @apply bg-gradient-to-r from-red-400 via-red-500 to-red-400 hover:from-red-500 hover:via-red-600 hover:to-red-500 text-white font-semibold px-6 py-3 rounded-full transition-all duration-300 hover:scale-105 shadow-lg;
+  }
+
+  /* ====== Layout Classes ====== */
+  .flex-center {
+    @apply flex justify-center items-center;
+  }
+
+  .grid-2-cols {
+    @apply grid grid-cols-2 gap-6;
+  }
+
+  .flex-wrap-center {
+    @apply flex gap-3 justify-center flex-wrap;
+  }
+
+  .flex-space-between {
+    @apply flex justify-between items-center;
+  }
+
+  /* ====== Loading Spinner ====== */
+  .loading-spinner {
+    @apply animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mt-4;
+  }
+
+  /* ====== Status Badges ====== */
+  .status-badge {
+    @apply bg-blue-100 text-blue-800 px-4 py-2 rounded-full text-sm font-semibold;
+  }
+
+  .status-badge-finished {
+    @apply bg-green-100 text-green-800 px-4 py-2 rounded-full text-sm font-semibold;
+  }
+
+  /* ====== Link Styles ====== */
+  .auth-link {
+    @apply text-blue-600 hover:text-blue-800 underline font-medium transition-colors;
+  }
+
+  /* ====== Group Hover Effects ====== */
+  .group-hover-opacity {
+    @apply opacity-0 group-hover:opacity-100 transition-opacity duration-300;
+  }
+
+  .hover-scale {
+    @apply hover:scale-105 transition-transform duration-300;
+  }
+
+  /* ====== Focus States ====== */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-blue-400;
+  }
+
+  /* ====== Background Gradient Classes ====== */
+  .bg-gradient-blue {
+    @apply bg-gradient-to-br from-blue-50 to-blue-100;
+  }
+
+  .bg-gradient-blue-hover {
+    @apply hover:from-blue-100 hover:to-blue-200;
+  }
+
+}

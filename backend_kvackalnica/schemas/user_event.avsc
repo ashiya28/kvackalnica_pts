@@ -1,0 +1,14 @@
+{
+  "type": "record",
+  "name": "UserEvent",
+  "namespace": "kvackalnica",
+  "fields": [
+    { "name": "event_id", "type": "string" },
+    { "name": "user_id", "type": "string" },
+    { "name": "activity_type", "type": "string" },
+    { "name": "event_time", "type": { "type": "long", "logicalType": "timestamp-millis" } },
+    { "name": "day", "type": "string" },
+    { "name": "entity_id", "type": "string" },
+    { "name": "metadata_json", "type": "string" }
+  ]
+}
