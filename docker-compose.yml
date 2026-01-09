@@ -13,6 +13,11 @@ services:
       - pgdata:/var/lib/postgresql/data
     ports:
       - "5432:5432"
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_replication_slots=4
+      -c max_wal_senders=4
     networks:
       - kvacka-net
 
@@ -134,13 +139,14 @@ services:
 
   # --- KAFKA CONNECT ---
   connect:
-    image: confluentinc/cp-kafka-connect:7.6.0
+    image: confluentinc/cp-kafka-connect:7.7.0
     container_name: connect
     hostname: connect
     depends_on:
       - kafka-broker
       - schema-registry
       - cassandra1
+      - db
     ports:
       - "8083:8083"
     environment:
@@ -169,10 +175,27 @@ services:
     volumes:
       - connect_plugins:/usr/share/confluent-hub-components
     command: >
-      bash -lc "
+      bash -c "
         confluent-hub install --no-prompt confluentinc/kafka-connect-cassandra:latest &&
+        confluent-hub install --no-prompt debezium/debezium-connector-postgresql:3.1.2 &&
+        confluent-hub install --no-prompt confluentinc/kafka-connect-s3:latest &&
         /etc/confluent/docker/run
       "
+    networks:
+      - kvacka-net
+
+  minio:
+    image: minio/minio:latest
+    container_name: minio
+    ports:
+      - "9000:9000"     # S3 API
+      - "9001:9001"     # MinIO Web UI
+    environment:
+      MINIO_ROOT_USER: "MinIOUser123"
+      MINIO_ROOT_PASSWORD: "MinIOPassword123"
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
     networks:
       - kvacka-net
 
@@ -184,3 +207,4 @@ volumes:
   pgdata:
   cassandra_data:
   connect_plugins:
+  minio_data:

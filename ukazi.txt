@@ -39,3 +39,34 @@ docker exec kafka-broker kafka-console-consumer --bootstrap-server kafka-broker:
 curl http://localhost:8081/subjects/user_events_by_day-value/versions/latest
 
 SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-01';
+
+____________________________________________________________
+
+2. del
+
+____________________________________________________________
+
+docker compose exec db psql -U kvack -d kvackalnica
+SHOW wal_level;
+SHOW max_replication_slots;
+SHOW max_wal_senders;
+
+____________________________________________________________
+
+curl http://localhost:8083/connector-plugins
+
+curl -X POST -H "Content-Type: application/json" --data @debezium-postgres-source.json http://localhost:8083/connectors
+curl http://localhost:8083/connectors/debezium-postgres-projects/status
+
+docker compose exec kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --list //poišči cdc.public.projects
+
+____________________________________________________________
+
+ustvarimo bucket bronze v MinIO Web UI: http://localhost:9001 (MinIOUser123 / MinIOPassword123)
+
+curl -X POST -H "Content-Type: application/json" --data @minio-s3-sink.json http://localhost:8083/connectors
+curl http://localhost:8083/connectors/minio-s3-sink-projects/status
+
+preveri podatke v MinIO:
+docker exec minio mc alias set myminio http://localhost:9000 MinIOUser123 MinIOPassword123
+docker exec minio mc ls myminio/bronze/topics/cdc.public.projects/ --recursive
