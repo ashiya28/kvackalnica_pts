@@ -1,5 +1,7 @@
 const { Kafka } = require("kafkajs");
 const { SchemaRegistry } = require("@kafkajs/confluent-schema-registry");
+const fs = require("fs");
+const path = require("path");
 
 const kafka = new Kafka({
   clientId: "kvackalnica-backend-1",
@@ -24,13 +26,54 @@ async function initSchemaWithRetry() {
 
   for (let attempt = 1; attempt <= 20; attempt++) {
     try {
-      // Učitaj value schema
-      schemaId = await registry.getLatestSchemaId(valueSubject);
-      console.log(`[kafka] loaded value schema (${valueSubject}), id =`, schemaId);
+      // Pokušaj učitati value schema, če ne obstaja jo registriraj
+      try {
+        schemaId = await registry.getLatestSchemaId(valueSubject);
+        console.log(`[kafka] loaded value schema (${valueSubject}), id =`, schemaId);
+      } catch (err) {
+        if (err.message.includes("not found")) {
+          console.log(`[kafka] registering value schema (${valueSubject})...`);
+          const valueSchemaPath = path.join(__dirname, "..", "schemas", "user_event.avsc");
+          const valueSchemaJson = JSON.parse(fs.readFileSync(valueSchemaPath, "utf-8"));
+          const result = await registry.register({
+            type: "AVRO",
+            schema: JSON.stringify(valueSchemaJson)
+          }, { subject: valueSubject });
+          schemaId = result.id || result;
+          console.log(`[kafka] registered value schema, id =`, schemaId);
+        } else {
+          throw err;
+        }
+      }
       
-      // Učitaj key schema
-      keySchemaId = await registry.getLatestSchemaId(keySubject);
-      console.log(`[kafka] loaded key schema (${keySubject}), id =`, keySchemaId);
+      // Pokušaj učitati key schema, če ne obstaja jo registriraj
+      try {
+        keySchemaId = await registry.getLatestSchemaId(keySubject);
+        console.log(`[kafka] loaded key schema (${keySubject}), id =`, keySchemaId);
+      } catch (err) {
+        if (err.message.includes("not found")) {
+          console.log(`[kafka] registering key schema (${keySubject})...`);
+          const keySchema = {
+            type: "record",
+            name: "UserEventKey",
+            namespace: "kvackalnica",
+            fields: [
+              { name: "day", type: "string" },
+              { name: "event_time", type: "long" },
+              { name: "event_id", type: "string" }
+            ]
+          };
+          const result = await registry.register({
+            type: "AVRO",
+            schema: JSON.stringify(keySchema)
+          }, { subject: keySubject });
+          keySchemaId = result.id || result;
+          console.log(`[kafka] registered key schema, id =`, keySchemaId);
+        } else {
+          throw err;
+        }
+      }
+      
       return;
     } catch (err) {
       console.error(`[kafka] schema init (attempt ${attempt}/20): ${err.message}`);

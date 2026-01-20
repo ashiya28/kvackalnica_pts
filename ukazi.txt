@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS kvackalnica.user_events_by_day (
 
 ____________________________________________________________
 
-docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --create --topic user_events_by_day --partitions 1 --replication-factor 1
+docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --create --topic "user_events_by_day" --partitions 1 --replication-factor 1
 
 docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --list
 
@@ -38,7 +38,7 @@ docker exec kafka-broker kafka-console-consumer --bootstrap-server kafka-broker:
 
 curl http://localhost:8081/subjects/user_events_by_day-value/versions/latest
 
-SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-01';
+SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-20';
 
 ____________________________________________________________
 

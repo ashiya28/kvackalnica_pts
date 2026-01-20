@@ -7,13 +7,15 @@ const { emitUserEvent } = require("../kafka/producer");
 
 const router = express.Router();
 
-function buildEvent(activity_type, user_id) {
+function buildEvent(activity_type, user_id, entity_id = "", metadata = {}) {
   return {
     event_id: randomUUID(),
     user_id,
     activity_type,
     event_time: Date.now(),
     day: new Date().toISOString().split("T")[0],
+    entity_id: entity_id || "",
+    metadata_json: JSON.stringify(metadata)
   };
 }
 

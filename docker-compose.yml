@@ -91,6 +91,10 @@ services:
       KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-broker:29092,PLAINTEXT_HOST://localhost:9092"
       KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      
+      # Single-node nastavitve za ksqlDB
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
 
       KAFKA_JMX_PORT: 9101
       KAFKA_JMX_HOSTNAME: localhost
@@ -196,6 +200,43 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_data:/data
+    networks:
+      - kvacka-net
+
+  # --- ksqlDB Server ---
+  ksqldb-server:
+    image: confluentinc/ksqldb-server:0.29.0
+    container_name: ksqldb-server
+    hostname: ksqldb-server
+    ports:
+      - "8088:8088"
+    environment:
+      KSQL_LISTENERS: "http://0.0.0.0:8088"
+      KSQL_BOOTSTRAP_SERVERS: "kafka-broker:29092"
+      KSQL_KSQL_SCHEMA_REGISTRY_URL: "http://schema-registry:8081"
+      KSQL_KSQL_CONNECT_URL: "http://connect:8083"
+      KSQL_KSQL_LOGGING_PROCESSING_STREAM_AUTO_CREATE: "true"
+      KSQL_KSQL_LOGGING_PROCESSING_TOPIC_AUTO_CREATE: "true"
+      
+      # Single-node nastavitve
+      KSQL_KSQL_INTERNAL_TOPIC_REPLICAS: 1
+      KSQL_KSQL_STREAMS_REPLICATION_FACTOR: 1
+      KSQL_KSQL_SINK_REPLICAS: 1
+    depends_on:
+      - kafka-broker
+      - schema-registry
+      - connect
+    networks:
+      - kvacka-net
+
+  # --- ksqlDB CLI ---
+  ksqldb-cli:
+    image: confluentinc/ksqldb-cli:0.29.0
+    container_name: ksqldb-cli
+    depends_on:
+      - ksqldb-server
+    entrypoint: /bin/sh
+    tty: true
     networks:
       - kvacka-net
 

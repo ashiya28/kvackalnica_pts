@@ -1,0 +1,166 @@
+1) Kaj že imamo iz naloge 9 (tvoj trenutni “pipeline”)
+
+Spletna aplikacija sproža dogodke (create/update/delete/… na projects).
+
+Kafka producer v aplikaciji te dogodke serializira v Avro format in pošlje v Kafka topic (npr. projects-events ali podobno).
+
+Schema Registry ima registrirano Avro shemo (tvoj producer jo uporablja).
+
+Kafka Connect teče (Confluent image) in ima konfiguriran Cassandra Sink Connector, ki bere iz topic-a in zapisuje v Cassandra tabelo (tvoja tabela projects ali druga, odvisno kako si rešila).
+
+V Cassandri vidiš dogodke, kar pomeni: producer → Kafka → connector → Cassandra dela.
+
+To je pomembno: v nalogi 10 ne začneš iz nule. KsqlDB pride “vmes” kot realnočasovni procesor.
+
+2) Kaj je nova ideja v nalogi 10 (kaj se spremeni)
+
+Naloga 10 doda ksqlDB, ki zna:
+
+iz topic-a narediti “logični” STREAM (tok dogodkov),
+
+izvajati push/pull query nad tokom,
+
+iz toka narediti nov STREAM (CSAS) kot materializiran rezultat (transformacije),
+
+iz toka narediti TABLE (CTAS) kot materializiran rezultat (agregacije, okna),
+
+in potem rezultat (agregiran ali transformiran) zapisati nazaj v Kafka topic,
+
+ter to novo temo preko (novega) Cassandra sink connectorja zapisati v novo Cassandra tabelo.
+
+
+____________________________________________________________
+docker-compose exec backend node createTables.js
+
+docker exec -it cassandra1 cqlsh
+
+CREATE KEYSPACE IF NOT EXISTS kvackalnica
+WITH replication = {'class': 'SimpleStrategy', 'replication_factor': 1};
+
+CREATE TABLE IF NOT EXISTS kvackalnica.user_events_by_day (
+  day text,
+  event_time bigint,
+  event_id text,
+  user_id text,
+  activity_type text,
+  PRIMARY KEY ((day), event_time, event_id)
+) WITH CLUSTERING ORDER BY (event_time DESC);
+
+exit
+
+docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --create --topic "user_events_by_day" --partitions 1 --replication-factor 1
+
+docker exec -it kafka-broker kafka-topics --bootstrap-server kafka-broker:29092 --list
+
+curl http://localhost:8083/connector-plugins
+
+curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink.json
+
+curl http://localhost:8083/connectors/cassandra-sink-activity/status
+
+docker exec -it cassandra1 cqlsh -e "SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-20' LIMIT 5;"
+
+____________________________________________________________
+
+docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
+
+SHOW TOPICS;
+PRINT 'user_events_by_day' FROM BEGINNING LIMIT 5;
+SHOW CONNECTORS;
+SHOW STREAMS;
+SHOW TABLES;
+SHOW QUERIES;
+
+exit;
+
+____________________________________________________________
+
+STREAM = neprekinjeni tok dogodkov (vedno samo dodajanje, nikoli update/delete)
+PULL query = "klasičen" SELECT - prebere trenutno stanje in se konča
+PUSH query = real-time streaming - kontinuirano pošilja nove dogodke
+CSAS = CREATE STREAM AS SELECT - naredi nov stream s transformacijo
+TABLE = materializiran view z agregirano stanje (lahko update/delete)
+CTAS = CREATE TABLE AS SELECT - naredi tabelo z agregacijo
+TUMBLING window = ne-prekrivna časovna okna (0-60s, 60-120s, ...)
+
+____________________________________________________________
+
+docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
+
+CREATE STREAM user_events_stream (
+  event_id VARCHAR,
+  user_id VARCHAR,
+  activity_type VARCHAR,
+  event_time BIGINT,
+  day VARCHAR
+) WITH (
+  KAFKA_TOPIC='user_events_by_day',
+  VALUE_FORMAT='AVRO'
+);
+
+# Opis streama
+DESCRIBE user_events_stream;
+
+# Preprost pull nad streamom (prebere nekaj vrstic in se ustavi)
+SELECT * FROM user_events_stream EMIT CHANGES LIMIT 5;
+
+# Push poizvedba s filtriranjem
+SELECT * FROM user_events_stream WHERE activity_type = 'CREATE_PROJECT' EMIT CHANGES LIMIT 5;
+
+# CSAS: transformiran stream (primer: upper activity_type)
+CREATE STREAM user_events_clean AS
+  SELECT
+    event_id,
+    user_id,
+    UCASE(activity_type) AS activity_type,
+    event_time,
+    day
+  FROM user_events_stream
+  EMIT CHANGES;
+
+DESCRIBE user_events_clean;
+SELECT * FROM user_events_clean EMIT CHANGES LIMIT 5;
+
+# CTAS: agregacija s tumbling oknom 1 minuto
+CREATE TABLE user_events_tumbling AS
+  SELECT
+    user_id,
+    WINDOWSTART AS window_start,
+    WINDOWEND   AS window_end,
+    COUNT(*)    AS event_count
+  FROM user_events_stream
+  WINDOW TUMBLING (SIZE 1 MINUTE)
+  GROUP BY user_id
+  EMIT CHANGES;
+
+DESCRIBE user_events_tumbling;
+
+# Preprost poizvedba nad tabelo (windowed, push)
+SELECT * FROM user_events_tumbling EMIT CHANGES LIMIT 5;
+
+____________________________________________________________
+# Zapis agregatov (tumbling) v Cassandro preko sink connectorja
+
+# 1) Cassandra tabela za agregate
+# (za okna 1 minuto; ksqlDB bo v topic USER_EVENTS_TUMBLING)
+docker exec -it cassandra1 cqlsh
+CREATE TABLE IF NOT EXISTS kvackalnica.user_events_tumbling (
+  user_id text,
+  window_start bigint,
+  window_end bigint,
+  event_count bigint,
+  PRIMARY KEY ((user_id), window_start, window_end)
+) WITH CLUSTERING ORDER BY (window_start DESC, window_end DESC);
+
+
+curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink-tumbling.json
+
+curl http://localhost:8083/connectors/cassandra-sink-tumbling/status
+
+???
+
+docker exec ksqldb-cli ksql http://ksqldb-server:8088 --execute "CREATE TABLE user_events_tumbling WITH (KAFKA_TOPIC='USER_EVENTS_TUMBLING', VALUE_FORMAT='JSON') AS SELECT user_id, WINDOWSTART AS window_start, WINDOWEND AS window_end, COUNT(*) AS event_count, AS_VALUE(user_id) AS user_id_val FROM user_events_stream WINDOW TUMBLING (SIZE 1 MINUTE) GROUP BY user_id EMIT CHANGES;"
+
+docker exec -it cassandra1 cqlsh -e "SELECT * FROM kvackalnica.user_events_tumbling LIMIT 20;"
+
+
