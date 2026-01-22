@@ -14,18 +14,25 @@
 
     "key.converter": "org.apache.kafka.connect.storage.StringConverter",
 
-    "value.converter": "io.confluent.connect.avro.AvroConverter",
-    "value.converter.schema.registry.url": "http://schema-registry:8081",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
 
     "confluent.topic.bootstrap.servers": "kafka-broker:29092",
     "confluent.topic.replication.factor": "1",
 
-    "consumer.override.group.id": "cassandra-sink-tumbling-v10",
+    "consumer.override.group.id": "cassandra-sink-tumbling-v11",
     "consumer.override.auto.offset.reset": "earliest",
 
-    "transforms": "convertKey",
+    "transforms": "renameVal,convertKey,renameKey",
+    "transforms.renameVal.type": "org.apache.kafka.connect.transforms.ReplaceField$Value",
+    "transforms.renameVal.renames": "ACTIVITY_TYPE_VAL:activity_type",
     "transforms.convertKey.type": "org.apache.kafka.connect.transforms.ValueToKey",
-    "transforms.convertKey.fields": "CNT",
+    "transforms.convertKey.fields": "activity_type",
+    "transforms.renameKey.type": "org.apache.kafka.connect.transforms.Cast$Key",
+    "transforms.renameKey.spec": "activity_type:string",
+
+    "pk.mode": "record_key",
+    "pk.fields": "activity_type,window_start,window_end",
 
     "errors.tolerance": "all",
     "errors.log.enable": "true",

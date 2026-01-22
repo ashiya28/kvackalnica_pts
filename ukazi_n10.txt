@@ -143,12 +143,15 @@ ____________________________________________________________
 # CTAS: agregacija s tumbling oknom 1 minuto
 # hkrati se ustvari kafka topic: PROJECT_MUTATIONS_PER_MINUTE
 
-CREATE TABLE project_mutations_per_minute AS
+docker exec -it ksqldb-cli ksql http://ksqldb-server:8088
+
+CREATE TABLE project_mutations_per_minute WITH (VALUE_FORMAT='JSON') AS
 SELECT
   activity_type,
+  AS_VALUE(activity_type) AS activity_type_val,
   WINDOWSTART AS window_start,
-  WINDOWEND   AS window_end,
-  COUNT(*)    AS cnt
+  WINDOWEND AS window_end,
+  COUNT(*) AS cnt
 FROM project_mutations_csas
 WINDOW TUMBLING (SIZE 1 MINUTE)
 GROUP BY activity_type
@@ -169,17 +172,16 @@ LIMIT 10;
 
 ____________________________________________________________
 
-docker exec -it cassandra1 cqlsh
+docker exec -it cassandra1 
 
-docker exec -it cassandra1 cqlsh -e "DROP TABLE IF EXISTS kvackalnica.project_mutations_per_minute; CREATE TABLE kvackalnica.project_mutations_per_minute ( event_time bigint PRIMARY KEY, cnt bigint );"
+CREATE TABLE IF NOT EXIST kvackalnica.project_mutations_per_minute ( 
+  activity_type text, 
+  window_start bigint, 
+  window_end bigint, 
+  cnt bigint, 
+  PRIMARY KEY ((activity_type), window_start, window_end) 
+) WITH CLUSTERING ORDER BY (window_start DESC, window_end DESC);
 
-CREATE TABLE IF NOT EXISTS kvackalnica.project_mutations_per_minute (
-  activity_type text,
-  window_start bigint,
-  window_end bigint,
-  conut bigint,
-  PRIMARY KEY ((activity_type), window_start)
-) WITH CLUSTERING ORDER BY (window_start DESC);
 
 curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink-tumbling.json
 
@@ -200,15 +202,5 @@ FROM kvackalnica.project_mutations_per_minute
 WHERE activity_type = 'DELETE_PROJECT'
 LIMIT 10;
 
-
-curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink-tumbling.json
-
-curl http://localhost:8083/connectors/cassandra-sink-tumbling/status
-
-???
-
-docker exec ksqldb-cli ksql http://ksqldb-server:8088 --execute "CREATE TABLE user_events_tumbling WITH (KAFKA_TOPIC='USER_EVENTS_TUMBLING', VALUE_FORMAT='JSON') AS SELECT user_id, WINDOWSTART AS window_start, WINDOWEND AS window_end, COUNT(*) AS event_count, AS_VALUE(user_id) AS user_id_val FROM user_events_stream WINDOW TUMBLING (SIZE 1 MINUTE) GROUP BY user_id EMIT CHANGES;"
-
-docker exec -it cassandra1 cqlsh -e "SELECT * FROM kvackalnica.user_events_tumbling LIMIT 20;"
 
 
