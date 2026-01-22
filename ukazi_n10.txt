@@ -58,7 +58,7 @@ curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json
 
 curl http://localhost:8083/connectors/cassandra-sink-activity/status
 
-docker exec -it cassandra1 cqlsh -e "SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-20' LIMIT 5;"
+docker exec -it cassandra1 cqlsh -e "SELECT * FROM kvackalnica.user_events_by_day WHERE day = '2026-01-22' LIMIT 5;"
 
 ____________________________________________________________
 
@@ -98,59 +98,107 @@ CREATE STREAM user_events_stream (
   VALUE_FORMAT='AVRO'
 );
 
-# Opis streama
 DESCRIBE user_events_stream;
+DESCRIBE user_events_stream EXTENDED;
 
-# Preprost pull nad streamom (prebere nekaj vrstic in se ustavi)
-SELECT * FROM user_events_stream EMIT CHANGES LIMIT 5;
+# Pravi pull query je v ksqlDB namenjen TABLE, ne STREAM.
+# STREAM predstavlja neprekinjen tok dogodkov in je primarno namenjen push poizvedbam.
+
+SELECT * FROM user_events_stream;
+
+# Push poizvedba
+# kontinuirana poizvedba - rezultati prihajajo sproti, ko se zgodijo novi dogodki - poizvedba teče, dokler je ne ustaviš
+
+SELECT * 
+FROM user_events_stream 
+EMIT CHANGES 
+LIMIT 5;
+
 
 # Push poizvedba s filtriranjem
-SELECT * FROM user_events_stream WHERE activity_type = 'CREATE_PROJECT' EMIT CHANGES LIMIT 5;
+SELECT * 
+FROM user_events_stream 
+WHERE activity_type = 'CREATE_PROJECT' 
+EMIT CHANGES 
+LIMIT 2;
 
-# CSAS: transformiran stream (primer: upper activity_type)
-CREATE STREAM user_events_clean AS
-  SELECT
-    event_id,
-    user_id,
-    UCASE(activity_type) AS activity_type,
-    event_time,
-    day
-  FROM user_events_stream
-  EMIT CHANGES;
+# CSAS (Create Stream as Select)
+CREATE STREAM project_mutations_csas AS
+SELECT
+  event_id,
+  user_id,
+  activity_type,
+  event_time,
+  day
+FROM user_events_stream
+WHERE activity_type IN ('CREATE_PROJECT', 'UPDATE_PROJECT', 'DELETE_PROJECT');
 
-DESCRIBE user_events_clean;
-SELECT * FROM user_events_clean EMIT CHANGES LIMIT 5;
+DESCRIBE project_mutations_csas;
+DESCRIBE project_mutations_csas EXTENDED;
 
-# CTAS: agregacija s tumbling oknom 1 minuto
-CREATE TABLE user_events_tumbling AS
-  SELECT
-    user_id,
-    WINDOWSTART AS window_start,
-    WINDOWEND   AS window_end,
-    COUNT(*)    AS event_count
-  FROM user_events_stream
-  WINDOW TUMBLING (SIZE 1 MINUTE)
-  GROUP BY user_id
-  EMIT CHANGES;
-
-DESCRIBE user_events_tumbling;
-
-# Preprost poizvedba nad tabelo (windowed, push)
-SELECT * FROM user_events_tumbling EMIT CHANGES LIMIT 5;
+SELECT * FROM project_mutations_csas EMIT CHANGES LIMIT 5;
 
 ____________________________________________________________
-# Zapis agregatov (tumbling) v Cassandro preko sink connectorja
 
-# 1) Cassandra tabela za agregate
-# (za okna 1 minuto; ksqlDB bo v topic USER_EVENTS_TUMBLING)
+# CTAS: agregacija s tumbling oknom 1 minuto
+# hkrati se ustvari kafka topic: PROJECT_MUTATIONS_PER_MINUTE
+
+CREATE TABLE project_mutations_per_minute AS
+SELECT
+  activity_type,
+  WINDOWSTART AS window_start,
+  WINDOWEND   AS window_end,
+  COUNT(*)    AS cnt
+FROM project_mutations_csas
+WINDOW TUMBLING (SIZE 1 MINUTE)
+GROUP BY activity_type
+EMIT CHANGES;
+
+DESCRIBE project_mutations_per_minute;
+DESCRIBE project_mutations_per_minute EXTENDED;
+
+SELECT *
+FROM project_mutations_per_minute
+WHERE activity_type = 'CREATE_PROJECT'
+LIMIT 10;
+
+SELECT *
+FROM project_mutations_per_minute
+LIMIT 10;
+
+
+____________________________________________________________
+
 docker exec -it cassandra1 cqlsh
-CREATE TABLE IF NOT EXISTS kvackalnica.user_events_tumbling (
-  user_id text,
+
+docker exec -it cassandra1 cqlsh -e "DROP TABLE IF EXISTS kvackalnica.project_mutations_per_minute; CREATE TABLE kvackalnica.project_mutations_per_minute ( event_time bigint PRIMARY KEY, cnt bigint );"
+
+CREATE TABLE IF NOT EXISTS kvackalnica.project_mutations_per_minute (
+  activity_type text,
   window_start bigint,
   window_end bigint,
-  event_count bigint,
-  PRIMARY KEY ((user_id), window_start, window_end)
-) WITH CLUSTERING ORDER BY (window_start DESC, window_end DESC);
+  conut bigint,
+  PRIMARY KEY ((activity_type), window_start)
+) WITH CLUSTERING ORDER BY (window_start DESC);
+
+curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink-tumbling.json
+
+curl http://localhost:8083/connectors/cassandra-sink-tumbling/status
+
+SELECT * 
+FROM kvackalnica.project_mutations_per_minute 
+WHERE activity_type = 'CREATE_PROJECT'
+LIMIT 10;
+
+SELECT * 
+FROM kvackalnica.project_mutations_per_minute 
+WHERE activity_type = 'UPDATE_PROJECT'
+LIMIT 10;
+
+SELECT * 
+FROM kvackalnica.project_mutations_per_minute 
+WHERE activity_type = 'DELETE_PROJECT'
+LIMIT 10;
 
 
 curl -X POST http://localhost:8083/connectors -H "Content-Type: application/json" -d @cassandra-sink-tumbling.json
